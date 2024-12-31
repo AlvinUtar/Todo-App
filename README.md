@@ -4,6 +4,7 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 ## Get started
 
+* After npm run, try account with {user}: abc@gmail.com & {pass}: abc123*
 1. Install dependencies
 
    ```bash
