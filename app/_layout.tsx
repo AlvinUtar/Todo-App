@@ -1,39 +1,58 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+import { Slot, useRouter, useSegments, usePathname } from "expo-router";
+import { useEffect } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../config/FirebaseConfig";
+import { useState } from "react";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+  const router = useRouter();
+  const segments = useSegments();
+  const pathname = usePathname();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Auth state change error:", error);
+      setIsAuthenticated(false);
+      setIsLoading(false);
+    });
 
-  if (!loaded) {
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (
+      // If the user is not signed in and not already on the login page
+      !isAuthenticated && 
+      !inAuthGroup && 
+      pathname !== "/LoginScreen"
+    ) {
+      // Redirect to login
+      router.replace("/LoginScreen");
+    } else if (
+      // If the user is signed in and on the login page
+      isAuthenticated && 
+      (pathname === "/LoginScreen" || inAuthGroup)
+    ) {
+      // Redirect to index
+      router.replace("/");
+    }
+  }, [isAuthenticated, isLoading, pathname, segments, router]);
+
+  // Render nothing until authentication state is determined
+  if (isLoading) {
     return null;
   }
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+  // Render the app
+  return <Slot />;
 }
